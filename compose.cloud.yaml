@@ -1,0 +1,22 @@
+secrets:
+  build-ca:
+    file: ${BUILD_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}
+services:
+  api:
+    build:
+      secrets: [build-ca]
+  gateway:
+    build:
+      secrets: [build-ca]
+  subscriber:
+    build:
+      secrets: [build-ca]
+  sensor-rest:
+    build:
+      secrets: [build-ca]
+  sensor-grpc:
+    build:
+      secrets: [build-ca]
+  sensor-web:
+    build:
+      secrets: [build-ca]

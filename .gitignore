@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+*_pb2.py
+*_pb2_grpc.py
+*.key
+*.pem
+*.crt
+certs/
+.chalice/deployed/
+.DS_Store

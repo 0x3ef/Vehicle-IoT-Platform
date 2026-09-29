@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+websockets>=14
+grpcio
+grpcio-tools
+paho-mqtt>=2
+requests

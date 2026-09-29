@@ -1,0 +1,89 @@
+x-telemetry-build: &telemetry-build
+  context: .
+  dockerfile: docker/telemetry.Dockerfile
+
+x-local-proxy: &local-proxy
+  NO_PROXY: gateway,api,localhost,127.0.0.1
+  no_proxy: gateway,api,localhost,127.0.0.1
+
+services:
+  mosquitto:
+    build: ./mqtt-broker
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "lab/ready", "-n"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  postgres:
+    build: ./postgres
+    environment:
+      POSTGRES_DB: iot_project
+      POSTGRES_USER: vehicle_lab
+      POSTGRES_PASSWORD: vehicle_lab
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "vehicle_lab", "-d", "iot_project"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  api:
+    build: ./API-Chalice
+    ports:
+      - "127.0.0.1:8100:8000"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: iot_project
+      DB_USER: vehicle_lab
+      DB_PASS: vehicle_lab
+      min_connections: "1"
+      max_connections: "5"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import http.client; c = http.client.HTTPConnection('127.0.0.1', 8000, timeout=2); c.request('GET', '/data'); assert c.getresponse().status == 200"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  gateway:
+    build: *telemetry-build
+    command: ["uvicorn", "gateway.app:app", "--host", "0.0.0.0", "--port", "5000"]
+    ports:
+      - "127.0.0.1:5100:5000"
+      - "127.0.0.1:8865:8765"
+      - "127.0.0.1:51051:50051"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+  subscriber:
+    build: *telemetry-build
+    command: ["python", "-m", "subscriber.main"]
+    environment: *local-proxy
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: on-failure
+  sensor-rest:
+    build: ./sensor-rest
+    environment: *local-proxy
+    depends_on:
+      - gateway
+    restart: on-failure
+  sensor-web:
+    build: ./sensor-webSocket
+    environment: *local-proxy
+    depends_on:
+      - gateway
+    restart: on-failure
+  sensor-grpc:
+    build: ./sensor-grpc
+    environment: *local-proxy
+    depends_on:
+      - gateway
+    restart: on-failure
+
+volumes:
+  postgres-data:
